@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../../../lib/supabaseClient";
-import { Save, ImagePlus, CheckCircle } from "lucide-react";
+import { Save, ImagePlus, CheckCircle, QrCode, Download } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 
 function Toast({ message, onDone }) {
   useEffect(() => {
@@ -25,6 +26,18 @@ function Toast({ message, onDone }) {
 export default function SettingsPage() {
   const { primary } = useOutletContext() || { primary: "#c89b4f" };
   const [toast, setToast] = useState(null);
+  const qrRef = useRef(null);
+  const menuUrl = window.location.origin + "/";
+
+  function downloadQR() {
+    const canvas = qrRef.current?.querySelector("canvas");
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "qr-menu.png";
+    a.click();
+  }
   const [settings, setSettings] = useState({
     business_name: "",
     description: "",
@@ -268,6 +281,36 @@ export default function SettingsPage() {
             : "Guardar configuración"}
         </button>
       </form>
+
+      {/* QR del menú */}
+      <div className="mt-10 max-w-xs rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
+        <h2 className="mb-1 flex items-center gap-2 font-semibold text-white">
+          <QrCode size={18} style={{ color: primary }} />
+          QR del menú
+        </h2>
+        <p className="mb-4 text-xs text-zinc-400">Escanealo para abrir la carta digital</p>
+
+        <div ref={qrRef} className="flex justify-center rounded-xl bg-white p-4">
+          <QRCodeCanvas
+            value={menuUrl}
+            size={180}
+            bgColor="#ffffff"
+            fgColor="#111111"
+            level="H"
+          />
+        </div>
+
+        <p className="mt-3 break-all text-center text-xs text-zinc-500">{menuUrl}</p>
+
+        <button
+          onClick={downloadQR}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-black transition hover:opacity-80"
+          style={{ backgroundColor: primary }}
+        >
+          <Download size={15} />
+          Descargar QR
+        </button>
+      </div>
 
       <AnimatePresence>
         {toast && <Toast message={toast} onDone={() => setToast(null)} />}

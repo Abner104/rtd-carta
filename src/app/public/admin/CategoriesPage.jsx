@@ -3,7 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
 import { supabase } from "../../../lib/supabaseClient";
-import { Plus, Trash2, CheckCircle } from "lucide-react";
+import { Plus, Trash2, CheckCircle, ImagePlus } from "lucide-react";
 
 function Toast({ message, onDone }) {
   useEffect(() => {
@@ -56,6 +56,17 @@ export default function CategoriesPage() {
     setToast("Categoría creada");
   }
 
+  async function uploadBanner(id, file) {
+    const ext = file.name.split(".").pop();
+    const fileName = `banner-${id}-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("products").upload(fileName, file, { upsert: true });
+    if (error) { setToast("Error subiendo banner"); return; }
+    const { data } = supabase.storage.from("products").getPublicUrl(fileName);
+    await supabase.from("categories").update({ banner_url: data.publicUrl }).eq("id", id);
+    await loadCategories();
+    setToast("Banner actualizado");
+  }
+
   async function deleteCategory(id, catName) {
     if (!confirm(`¿Eliminar "${catName}"? Los productos de esta categoría quedarán sin categoría.`)) return;
     await supabase.from("categories").delete().eq("id", id);
@@ -98,14 +109,23 @@ export default function CategoriesPage() {
             key={category.id}
             className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5"
           >
-            <div>
-              <h3 className="text-lg font-semibold">{category.name}</h3>
-              <p className={`mt-1 text-sm ${category.active ? "text-green-400" : "text-red-400"}`}>
-                {category.active ? "Activa" : "Desactivada"}
-              </p>
+            <div className="flex items-center gap-4">
+              {category.banner_url && (
+                <img src={category.banner_url} alt={category.name} className="h-12 w-20 rounded-lg object-cover" />
+              )}
+              <div>
+                <h3 className="text-lg font-semibold">{category.name}</h3>
+                <p className={`mt-0.5 text-sm ${category.active ? "text-green-400" : "text-red-400"}`}>
+                  {category.active ? "Activa" : "Desactivada"}
+                </p>
+              </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="cursor-pointer rounded-lg p-2 transition hover:opacity-70" style={{ color: primary }} title="Subir banner">
+                <ImagePlus size={16} />
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadBanner(category.id, e.target.files[0])} />
+              </label>
               <button
                 onClick={() => toggleCategory(category.id, category.active)}
                 className="rounded-lg px-4 py-2 text-sm font-medium transition"

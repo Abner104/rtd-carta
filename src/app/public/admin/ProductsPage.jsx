@@ -3,7 +3,98 @@ import { useOutletContext } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
 import { supabase } from "../../../lib/supabaseClient";
-import { Plus, Trash2, ImagePlus, CheckCircle, ChevronDown, FlaskConical } from "lucide-react";
+import { Plus, Trash2, ImagePlus, CheckCircle, ChevronDown, FlaskConical, GripVertical } from "lucide-react";
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext, useSortable, verticalListSortingStrategy, arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+function SortableProductItem({ product, primary, openVariants, setOpenVariants, toggleProduct, deleteProduct, setToast, loadData }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: product.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <div className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5 md:flex-row md:items-center md:justify-between">
+        <div className="flex gap-4">
+          {/* Handle drag */}
+          <button {...attributes} {...listeners} className="flex-shrink-0 cursor-grab text-zinc-600 hover:text-zinc-400 active:cursor-grabbing mt-1">
+            <GripVertical size={18} />
+          </button>
+          {product.image_url
+            ? <img src={product.image_url} alt={product.name} className="h-20 w-20 rounded-xl object-cover" />
+            : <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-zinc-800 text-xs text-zinc-500">Sin img</div>
+          }
+          <div>
+            <p className="text-sm" style={{ color: primary }}>{product.categories?.name || "Sin categoría"}</p>
+            <h3 className="text-xl font-semibold">{product.name}</h3>
+            <p className="mt-1 text-sm text-zinc-400">{product.description}</p>
+            <div className="mt-2 flex gap-4 text-sm text-zinc-300">
+              {product.price_500 > 0 && <span>500ml: ${Number(product.price_500).toLocaleString("es-CL")}</span>}
+              {product.price_1000 > 0 && <span>1L: ${Number(product.price_1000).toLocaleString("es-CL")}</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setOpenVariants(openVariants === product.id ? null : product.id)}
+            className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition"
+            style={{ backgroundColor: `${primary}18`, color: primary }}
+          >
+            <FlaskConical size={14} />
+            Sabores
+            <ChevronDown size={13} style={{ transform: openVariants === product.id ? "rotate(180deg)" : "rotate(0)" }} />
+          </button>
+          <select
+            value={product.badge || ""}
+            onChange={async (e) => {
+              await supabase.from("products").update({ badge: e.target.value || null }).eq("id", product.id);
+              await loadData();
+              setToast("Badge actualizado");
+            }}
+            className="rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-2 text-xs text-white outline-none"
+          >
+            <option value="">Sin badge</option>
+            <option value="nuevo">✨ Nuevo</option>
+            <option value="popular">🔥 Popular</option>
+          </select>
+          <button
+            onClick={() => toggleProduct(product.id, product.active)}
+            className="rounded-lg px-3 py-2 text-sm font-medium transition"
+            style={product.active
+              ? { backgroundColor: "rgba(239,68,68,0.15)", color: "#f87171" }
+              : { backgroundColor: "rgba(34,197,94,0.15)", color: "#4ade80" }
+            }
+          >
+            {product.active ? "Desactivar" : "Activar"}
+          </button>
+          <button
+            onClick={() => deleteProduct(product.id, product.name)}
+            className="rounded-lg bg-red-500/20 p-2 text-red-400 hover:bg-red-500/30 transition"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {openVariants === product.id && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <VariantsPanel product={product} primary={primary} onToast={setToast} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 function VariantsPanel({ product, primary, onToast }) {
   const [variants, setVariants] = useState([]);
@@ -116,6 +207,22 @@ export default function ProductsPage() {
   const [openVariants, setOpenVariants] = useState(null);
   const listRef = useRef(null);
   const formRef = useRef(null);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  async function handleDragEnd(event) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = products.findIndex((p) => p.id === active.id);
+    const newIndex = products.findIndex((p) => p.id === over.id);
+    const reordered = arrayMove(products, oldIndex, newIndex);
+    setProducts(reordered);
+    // Actualiza sort_order en Supabase
+    await Promise.all(reordered.map((p, i) =>
+      supabase.from("products").update({ sort_order: i }).eq("id", p.id)
+    ));
+    setToast("Orden guardado");
+  }
 
   const [form, setForm] = useState({
     category_id: "", name: "", description: "", price_500: "", price_1000: "",
@@ -257,72 +364,25 @@ export default function ProductsPage() {
         </button>
       </form>
 
-      <div ref={listRef} className="mt-8 grid gap-4">
-        {products.map((product) => (
-          <div key={product.id}>
-          <div className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5 md:flex-row md:items-center md:justify-between">
-            <div className="flex gap-4">
-              {product.image_url ? (
-                <img src={product.image_url} alt={product.name} className="h-20 w-20 rounded-xl object-cover" />
-              ) : (
-                <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-zinc-800 text-xs text-zinc-500">Sin img</div>
-              )}
-              <div>
-                <p className="text-sm" style={{ color: primary }}>{product.categories?.name || "Sin categoría"}</p>
-                <h3 className="text-xl font-semibold">{product.name}</h3>
-                <p className="mt-1 text-sm text-zinc-400">{product.description}</p>
-                <div className="mt-2 flex gap-4 text-sm text-zinc-300">
-                  {product.price_500 > 0 && <span>500ml: ${Number(product.price_500).toLocaleString("es-CL")}</span>}
-                  {product.price_1000 > 0 && <span>1L: ${Number(product.price_1000).toLocaleString("es-CL")}</span>}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setOpenVariants(openVariants === product.id ? null : product.id)}
-                className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition"
-                style={{ backgroundColor: `${primary}18`, color: primary }}
-              >
-                <FlaskConical size={14} />
-                Sabores
-                <ChevronDown size={13} className="transition-transform" style={{ transform: openVariants === product.id ? "rotate(180deg)" : "rotate(0)" }} />
-              </button>
-              <button
-                onClick={() => toggleProduct(product.id, product.active)}
-                className="rounded-lg px-3 py-2 text-sm font-medium transition"
-                style={product.active
-                  ? { backgroundColor: "rgba(239,68,68,0.15)", color: "#f87171" }
-                  : { backgroundColor: "rgba(34,197,94,0.15)", color: "#4ade80" }
-                }
-              >
-                {product.active ? "Desactivar" : "Activar"}
-              </button>
-              <button
-                onClick={() => deleteProduct(product.id, product.name)}
-                className="rounded-lg bg-red-500/20 p-2 text-red-400 hover:bg-red-500/30 transition"
-              >
-                <Trash2 size={18} />
-              </button>
-            </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={products.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+          <div ref={listRef} className="mt-8 grid gap-4">
+            {products.map((product) => (
+              <SortableProductItem
+                key={product.id}
+                product={product}
+                primary={primary}
+                openVariants={openVariants}
+                setOpenVariants={setOpenVariants}
+                toggleProduct={toggleProduct}
+                deleteProduct={deleteProduct}
+                setToast={setToast}
+                loadData={loadData}
+              />
+            ))}
           </div>
-
-          <AnimatePresence>
-            {openVariants === product.id && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25 }}
-                className="overflow-hidden"
-              >
-                <VariantsPanel product={product} primary={primary} onToast={setToast} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-          </div>
-        ))}
-      </div>
+        </SortableContext>
+      </DndContext>
 
       <AnimatePresence>
         {toast && <Toast message={toast} onDone={() => setToast(null)} />}

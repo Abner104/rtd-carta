@@ -1,7 +1,7 @@
-import { Outlet, Link, useLocation } from "react-router-dom";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
-import { LayoutDashboard, Tag, Package, Settings, ExternalLink, Menu, X } from "lucide-react";
+import { LayoutDashboard, Tag, Package, Settings, ExternalLink, Menu, X, LogOut, Megaphone } from "lucide-react";
 import { gsap } from "gsap";
 import { AnimatePresence, motion } from "framer-motion";
 import BartenderLoader from "../../../components/menu/BartenderLoader";
@@ -10,6 +10,7 @@ const NAV = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/admin/categorias", label: "Categorías", icon: Tag },
   { to: "/admin/productos", label: "Productos", icon: Package },
+  { to: "/admin/promociones", label: "Promociones", icon: Megaphone },
   { to: "/admin/configuracion", label: "Configuración", icon: Settings },
 ];
 
@@ -30,7 +31,13 @@ export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const sidebarRef = useRef(null);
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    navigate("/admin/login");
+  }
 
   useEffect(() => {
     supabase.from("settings").select("logo_url, business_name, primary_color, background_color").limit(1).maybeSingle()
@@ -98,6 +105,14 @@ export default function AdminLayout() {
         <ExternalLink size={15} />
         Ver menú
       </a>
+
+      <button
+        onClick={handleLogout}
+        className="mt-2 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-zinc-500 transition hover:text-red-400"
+      >
+        <LogOut size={15} />
+        Cerrar sesión
+      </button>
     </>
   );
 

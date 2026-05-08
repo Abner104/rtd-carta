@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
-import { Wine, Clock, AtSign, ChevronDown, Menu, X } from "lucide-react";
+import { Wine, Clock, AtSign, ChevronDown, Menu, X, Search, Sun, Moon } from "lucide-react";
+import { useTheme } from "../../lib/useTheme";
 import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
 import BartenderLoader from "../../components/menu/BartenderLoader";
@@ -36,8 +37,18 @@ function ProductCard({ product, primary }) {
 
         <div className="flex flex-1 flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div className="pl-3 sm:pl-4" style={{ borderLeft: `2px solid ${primary}40` }}>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base font-black uppercase tracking-[0.12em] sm:text-lg md:text-xl">{product.name}</h3>
+              {product.badge === "nuevo" && (
+                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ backgroundColor: `${primary}30`, color: primary }}>
+                  Nuevo
+                </span>
+              )}
+              {product.badge === "popular" && (
+                <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-orange-400">
+                  🔥 Popular
+                </span>
+              )}
               <ChevronDown size={15} className="flex-shrink-0 transition-transform duration-300" style={{ color: primary, transform: open ? "rotate(180deg)" : "rotate(0deg)" }} />
             </div>
             <p className="mt-1 text-xs text-zinc-400 sm:text-sm md:max-w-sm">{product.description}</p>
@@ -92,9 +103,11 @@ export default function MenuPage() {
   const [activeCategory, setActiveCategory] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [promotions, setPromotions] = useState([]);
 
-  // Colores para el loader — usa cache si existe
   const [loaderColors] = useState(getCachedColors);
+  const { dark, toggle: toggleTheme, bg: themeBg, surface, text, textMuted } = useTheme(settings?.primary_color);
 
   const sidebarRef = useRef(null);
   const logoRef = useRef(null);
@@ -103,17 +116,27 @@ export default function MenuPage() {
   const isScrollingRef = useRef(false);
   const scrollTimerRef = useRef(null);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+    // Registra visita (una por sesión)
+    if (!sessionStorage.getItem("rtd_visited")) {
+      supabase.from("page_views").insert({}).then(() => {
+        sessionStorage.setItem("rtd_visited", "1");
+      });
+    }
+  }, []);
 
   async function loadData() {
-    const [{ data: s }, { data: c }, { data: p }] = await Promise.all([
+    const [{ data: s }, { data: c }, { data: p }, { data: promo }] = await Promise.all([
       supabase.from("settings").select("*").limit(1).maybeSingle(),
       supabase.from("categories").select("*").eq("active", true).order("sort_order"),
       supabase.from("products").select("*, categories(name)").eq("active", true).order("sort_order"),
+      supabase.from("promotions").select("*").eq("active", true).order("sort_order"),
     ]);
     setSettings(s || null);
     setCategories(c || []);
     setProducts(p || []);
+    setPromotions(promo || []);
     setActiveCategory(c?.[0]?.id || null);
 
     // Guarda colores en cache para el próximo loading
@@ -202,7 +225,15 @@ export default function MenuPage() {
   }
 
   const primary = settings?.primary_color || "#c89b4f";
-  const bg = settings?.background_color || "#080808";
+  const bg = themeBg; // controlado por toggle, no por settings
+
+  const isSearching = search.trim().length > 0;
+  const searchResults = isSearching
+    ? products.filter((p) =>
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.description?.toLowerCase().includes(search.toLowerCase())
+      )
+    : [];
 
   const SidebarContent = () => (
     <>
@@ -220,7 +251,23 @@ export default function MenuPage() {
         <div className="mx-auto mt-4 h-px w-12 opacity-30" style={{ backgroundColor: primary }} />
       </div>
 
-      <nav className="mt-8 space-y-1">
+      {/* Buscador sidebar */}
+      <div className="mt-6 flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2">
+        <Search size={14} style={{ color: primary }} className="flex-shrink-0" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar trago..."
+          className="flex-1 bg-transparent text-xs text-white outline-none placeholder-zinc-600"
+        />
+        {search && (
+          <button onClick={() => setSearch("")} className="text-zinc-500 hover:text-white transition">
+            <X size={12} />
+          </button>
+        )}
+      </div>
+
+      <nav className="mt-4 space-y-1">
         {categories.map((cat) => {
           const isActive = activeCategory === cat.id;
           return (
@@ -263,13 +310,23 @@ export default function MenuPage() {
           @{settings.instagram}
         </a>
       )}
+
+      {/* Toggle tema */}
+      <button
+        onClick={toggleTheme}
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-medium transition hover:opacity-70"
+        style={{ border: `1px solid ${primary}22`, color: textMuted }}
+      >
+        {dark ? <Sun size={14} /> : <Moon size={14} />}
+        {dark ? "Modo claro" : "Modo oscuro"}
+      </button>
     </>
   );
 
   if (!loaded) return <BartenderLoader primary={loaderColors.primary} bg={loaderColors.bg} />;
 
   return (
-    <main className="min-h-screen text-white" style={{ backgroundColor: bg }}>
+    <main className="min-h-screen transition-colors duration-300" style={{ backgroundColor: bg, color: text }}>
       <div className="flex min-h-screen">
 
         {/* Sidebar desktop — ancho fijo, sticky */}
@@ -297,9 +354,30 @@ export default function MenuPage() {
               }
               <span className="text-sm font-bold tracking-widest">{settings?.business_name || "RTD COCKTAILS"}</span>
             </div>
-            <button onClick={() => setMenuOpen(true)} className="rounded-lg p-1.5" style={{ color: primary }}>
-              <Menu size={22} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button onClick={toggleTheme} className="rounded-lg p-1.5 transition hover:opacity-70" style={{ color: textMuted }}>
+                {dark ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <button onClick={() => setMenuOpen(true)} className="rounded-lg p-1.5" style={{ color: primary }}>
+                <Menu size={22} />
+              </button>
+            </div>
+          </div>
+
+          {/* Buscador mobile */}
+          <div className="flex items-center gap-2 mx-4 mb-2 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2">
+            <Search size={13} style={{ color: primary }} className="flex-shrink-0" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar trago..."
+              className="flex-1 bg-transparent text-xs text-white outline-none placeholder-zinc-600"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="text-zinc-500">
+                <X size={12} />
+              </button>
+            )}
           </div>
 
           {/* Tabs de categorías con scroll */}
@@ -351,47 +429,119 @@ export default function MenuPage() {
           )}
         </AnimatePresence>
 
-        {/* Contenido: todas las secciones */}
-        <section className="min-w-0 flex-1 px-4 pb-20 pt-28 sm:px-8 sm:pt-32 lg:px-16 lg:pt-12 xl:px-24">
-          {categories.map((cat) => {
-            const catProducts = products.filter((p) => p.category_id === cat.id);
-            return (
-              <div
-                key={cat.id}
-                ref={(el) => { sectionRefs.current[cat.id] = el; }}
-                data-category-id={cat.id}
-                className="mb-14"
-              >
-                {/* Título sección */}
-                <div className="mb-6">
-                  <div className="h-px w-10" style={{ backgroundColor: primary }} />
-                  <h2 className="mt-3 text-3xl font-black uppercase tracking-widest sm:text-4xl lg:text-6xl">{cat.name}</h2>
-                  <div className="mt-3 h-px w-10" style={{ backgroundColor: primary }} />
-                </div>
+        {/* Contenido */}
+        <section className="min-w-0 flex-1 px-4 pb-20 pt-28 sm:px-8 sm:pt-36 lg:px-16 lg:pt-12 xl:px-24">
 
-                {/* Sin productos */}
-                {catProducts.length === 0 && (
-                  <div className="flex items-center gap-3 rounded-xl border px-5 py-6 text-zinc-500" style={{ borderColor: `${primary}18` }}>
-                    <Wine size={20} style={{ color: `${primary}44` }} />
-                    <p className="text-sm">Próximamente productos en esta categoría.</p>
-                  </div>
-                )}
-
-                {/* Productos */}
-                {catProducts.map((product, index) => (
+          {/* Promociones destacadas */}
+          {promotions.length > 0 && !isSearching && (
+            <div className="mb-10">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {promotions.map((promo, i) => (
                   <motion.div
-                    key={product.id}
-                    initial={{ opacity: 0, y: 14 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.05, duration: 0.3 }}
+                    key={promo.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.07 }}
+                    className="relative overflow-hidden rounded-2xl p-5"
+                    style={{ backgroundColor: `${primary}15`, border: `1px solid ${primary}30` }}
                   >
-                    <ProductCard product={product} primary={primary} />
+                    {promo.badge && (
+                      <span className="mb-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                        style={{ backgroundColor: `${primary}30`, color: primary }}>
+                        {promo.badge}
+                      </span>
+                    )}
+                    <h3 className="font-black uppercase tracking-wider" style={{ color: primary }}>{promo.title}</h3>
+                    {promo.description && <p className="mt-1 text-sm" style={{ color: textMuted }}>{promo.description}</p>}
+                    {/* Decoración */}
+                    <div className="pointer-events-none absolute -right-4 -top-4 h-16 w-16 rounded-full opacity-10" style={{ backgroundColor: primary }} />
                   </motion.div>
                 ))}
               </div>
-            );
-          })}
+              <div className="mt-6 h-px w-full opacity-10" style={{ backgroundColor: primary }} />
+            </div>
+          )}
+
+          {/* Resultados de búsqueda */}
+          <AnimatePresence mode="wait">
+            {isSearching ? (
+              <motion.div key="search" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <div className="mb-6">
+                  <div className="h-px w-10" style={{ backgroundColor: primary }} />
+                  <h2 className="mt-3 text-2xl font-black uppercase tracking-widest sm:text-3xl">
+                    Resultados para "{search}"
+                  </h2>
+                  <div className="mt-3 h-px w-10" style={{ backgroundColor: primary }} />
+                </div>
+
+                {searchResults.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 py-16 text-zinc-500">
+                    <Wine size={40} style={{ color: `${primary}33` }} />
+                    <p className="text-sm">No encontramos "{search}" en la carta.</p>
+                    <button onClick={() => setSearch("")} className="text-xs underline" style={{ color: primary }}>
+                      Ver toda la carta
+                    </button>
+                  </div>
+                ) : (
+                  searchResults.map((product, index) => (
+                    <motion.div key={product.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04 }}>
+                      <p className="mb-1 text-xs" style={{ color: primary }}>{product.categories?.name}</p>
+                      <ProductCard product={product} primary={primary} />
+                    </motion.div>
+                  ))
+                )}
+              </motion.div>
+            ) : (
+              <motion.div key="sections" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                {categories.map((cat) => {
+                  const catProducts = products.filter((p) => p.category_id === cat.id);
+                  return (
+                    <div
+                      key={cat.id}
+                      ref={(el) => { sectionRefs.current[cat.id] = el; }}
+                      data-category-id={cat.id}
+                      className="mb-14"
+                    >
+                      <div className="mb-6">
+                        {cat.banner_url && (
+                          <div className="mb-6 overflow-hidden rounded-2xl">
+                            <img
+                              src={cat.banner_url}
+                              alt={cat.name}
+                              className="h-32 w-full object-cover sm:h-48"
+                              style={{ filter: dark ? "brightness(0.8)" : "brightness(0.95)" }}
+                            />
+                          </div>
+                        )}
+                        <div className="h-px w-10" style={{ backgroundColor: primary }} />
+                        <h2 className="mt-3 text-3xl font-black uppercase tracking-widest sm:text-4xl lg:text-6xl">{cat.name}</h2>
+                        <div className="mt-3 h-px w-10" style={{ backgroundColor: primary }} />
+                      </div>
+
+                      {catProducts.length === 0 && (
+                        <div className="flex items-center gap-3 rounded-xl border px-5 py-6 text-zinc-500" style={{ borderColor: `${primary}18` }}>
+                          <Wine size={20} style={{ color: `${primary}44` }} />
+                          <p className="text-sm">Próximamente productos en esta categoría.</p>
+                        </div>
+                      )}
+
+                      {catProducts.map((product, index) => (
+                        <motion.div
+                          key={product.id}
+                          initial={{ opacity: 0, y: 14 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true }}
+                          transition={{ delay: index * 0.05, duration: 0.3 }}
+                        >
+                          <ProductCard product={product} primary={primary} />
+                        </motion.div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </section>
       </div>
     </main>
