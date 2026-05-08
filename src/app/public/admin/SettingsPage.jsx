@@ -30,12 +30,59 @@ export default function SettingsPage() {
   const menuUrl = window.location.origin + "/";
 
   function downloadQR() {
-    const canvas = qrRef.current?.querySelector("canvas");
-    if (!canvas) return;
-    const url = canvas.toDataURL("image/png");
+    // Crea canvas final con marco decorativo
+    const qrCanvas = qrRef.current?.querySelector("canvas");
+    if (!qrCanvas) return;
+
+    const pad = 32;
+    const footerH = 56;
+    const size = qrCanvas.width;
+    const total = size + pad * 2;
+
+    const out = document.createElement("canvas");
+    out.width = total;
+    out.height = total + footerH;
+    const ctx = out.getContext("2d");
+
+    // Fondo oscuro
+    ctx.fillStyle = "#0a0a0a";
+    ctx.roundRect(0, 0, out.width, out.height, 20);
+    ctx.fill();
+
+    // Borde decorativo
+    ctx.strokeStyle = primary + "66";
+    ctx.lineWidth = 1.5;
+    ctx.roundRect(6, 6, out.width - 12, out.height - 12, 16);
+    ctx.stroke();
+
+    // Esquinas estilo cóctel
+    const corner = 18;
+    ctx.strokeStyle = primary;
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    [[8, 8], [out.width - 8, 8], [8, out.height - 8], [out.width - 8, out.height - 8]].forEach(([x, y]) => {
+      const dx = x < out.width / 2 ? 1 : -1;
+      const dy = y < out.height / 2 ? 1 : -1;
+      ctx.beginPath(); ctx.moveTo(x + dx * corner, y); ctx.lineTo(x, y); ctx.lineTo(x, y + dy * corner); ctx.stroke();
+    });
+
+    // QR
+    ctx.drawImage(qrCanvas, pad, pad);
+
+    // Footer
+    ctx.fillStyle = primary + "22";
+    ctx.fillRect(0, total, out.width, footerH);
+    ctx.fillStyle = primary;
+    ctx.font = "bold 13px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(settings.business_name || "RTD COCKTAILS", out.width / 2, total + 22);
+    ctx.fillStyle = "#ffffff66";
+    ctx.font = "10px sans-serif";
+    ctx.fillText("Escaneá para ver la carta", out.width / 2, total + 40);
+
     const a = document.createElement("a");
-    a.href = url;
-    a.download = "qr-menu.png";
+    a.href = out.toDataURL("image/png");
+    a.download = "qr-cocktail.png";
     a.click();
   }
   const [settings, setSettings] = useState({
@@ -283,28 +330,62 @@ export default function SettingsPage() {
       </form>
 
       {/* QR del menú */}
-      <div className="mt-10 max-w-xs rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
+      <div className="mt-10 max-w-xs">
         <h2 className="mb-1 flex items-center gap-2 font-semibold text-white">
           <QrCode size={18} style={{ color: primary }} />
           QR del menú
         </h2>
         <p className="mb-4 text-xs text-zinc-400">Escanealo para abrir la carta digital</p>
 
-        <div ref={qrRef} className="flex justify-center rounded-xl bg-white p-4">
-          <QRCodeCanvas
-            value={menuUrl}
-            size={180}
-            bgColor="#ffffff"
-            fgColor="#111111"
-            level="H"
-          />
-        </div>
+        {/* Card estilo cóctel */}
+        <div
+          ref={qrRef}
+          className="relative overflow-hidden rounded-2xl p-6"
+          style={{ backgroundColor: "#0a0a0a", border: `1px solid ${primary}44` }}
+        >
+          {/* Esquinas decorativas */}
+          {[
+            "top-3 left-3 border-t-2 border-l-2 rounded-tl-lg",
+            "top-3 right-3 border-t-2 border-r-2 rounded-tr-lg",
+            "bottom-3 left-3 border-b-2 border-l-2 rounded-bl-lg",
+            "bottom-3 right-3 border-b-2 border-r-2 rounded-br-lg",
+          ].map((cls, i) => (
+            <div key={i} className={`absolute h-5 w-5 ${cls}`} style={{ borderColor: primary }} />
+          ))}
 
-        <p className="mt-3 break-all text-center text-xs text-zinc-500">{menuUrl}</p>
+          {/* QR con colores del tema */}
+          <div className="flex justify-center">
+            <QRCodeCanvas
+              value={menuUrl}
+              size={180}
+              bgColor="#0a0a0a"
+              fgColor={primary}
+              level="H"
+              imageSettings={settings.logo_url ? {
+                src: settings.logo_url,
+                height: 36,
+                width: 36,
+                excavate: true,
+              } : undefined}
+            />
+          </div>
+
+          {/* Footer */}
+          <div className="mt-4 border-t pt-4 text-center" style={{ borderColor: `${primary}22` }}>
+            <p className="text-sm font-bold uppercase tracking-widest" style={{ color: primary }}>
+              {settings.business_name || "RTD COCKTAILS"}
+            </p>
+            <p className="mt-0.5 text-xs text-zinc-600">Escaneá para ver la carta</p>
+          </div>
+
+          {/* Decoración de fondo */}
+          <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-5" style={{ backgroundColor: primary }} />
+          <div className="pointer-events-none absolute -left-8 -bottom-8 h-20 w-20 rounded-full opacity-5" style={{ backgroundColor: primary }} />
+        </div>
 
         <button
           onClick={downloadQR}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-black transition hover:opacity-80"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-black transition hover:opacity-80"
           style={{ backgroundColor: primary }}
         >
           <Download size={15} />

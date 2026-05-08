@@ -112,9 +112,11 @@ export default function MenuPage() {
   const sidebarRef = useRef(null);
   const logoRef = useRef(null);
   const tabsRef = useRef(null);
+  const topbarRef = useRef(null);
   const sectionRefs = useRef({});
   const isScrollingRef = useRef(false);
   const scrollTimerRef = useRef(null);
+  const [topbarHeight, setTopbarHeight] = useState(160);
 
   useEffect(() => {
     loadData();
@@ -147,6 +149,16 @@ export default function MenuPage() {
   }
 
   // GSAP entrada sidebar desktop
+  // Mide el alto real del topbar mobile
+  useEffect(() => {
+    if (!topbarRef.current) return;
+    const update = () => setTopbarHeight(topbarRef.current.offsetHeight + 8);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(topbarRef.current);
+    return () => ro.disconnect();
+  }, [loaded]);
+
   useEffect(() => {
     if (!loaded) return;
     if (logoRef.current) {
@@ -213,8 +225,8 @@ export default function MenuPage() {
 
     const el = sectionRefs.current[catId];
     if (el) {
-      const topbarHeight = window.innerWidth < 1024 ? 110 : 24;
-      const top = el.getBoundingClientRect().top + window.scrollY - topbarHeight;
+      const offset = window.innerWidth < 1024 ? topbarHeight + 8 : 24;
+      const top = el.getBoundingClientRect().top + window.scrollY - offset;
       window.scrollTo({ top, behavior: "smooth" });
     }
 
@@ -345,7 +357,7 @@ export default function MenuPage() {
         </aside>
 
         {/* Topbar sticky mobile */}
-        <div className="fixed left-0 right-0 top-0 z-30 lg:hidden" style={{ backgroundColor: bg, borderBottom: `1px solid ${primary}18` }}>
+        <div ref={topbarRef} className="fixed left-0 right-0 top-0 z-30 lg:hidden" style={{ backgroundColor: bg, borderBottom: `1px solid ${primary}18` }}>
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
               {settings?.logo_url
@@ -430,7 +442,10 @@ export default function MenuPage() {
         </AnimatePresence>
 
         {/* Contenido */}
-        <section className="min-w-0 flex-1 px-4 pb-20 pt-28 sm:px-8 sm:pt-36 lg:px-16 lg:pt-12 xl:px-24">
+        <section
+          className="min-w-0 flex-1 px-4 pb-20 lg:px-16 lg:pt-12 xl:px-24"
+          style={{ paddingTop: window.innerWidth < 1024 ? topbarHeight : undefined }}
+        >
 
           {/* Promociones destacadas */}
           {promotions.length > 0 && !isSearching && (
