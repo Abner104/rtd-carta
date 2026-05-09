@@ -80,7 +80,19 @@ export default function SettingsPage() {
     ctx.font = "10px sans-serif";
     ctx.fillText("Escaneá para ver la carta", out.width / 2, total + 40);
 
-    out.toBlob((blob) => {
+    out.toBlob(async (blob) => {
+      // Web Share API — funciona en iOS Safari y Android Chrome
+      if (navigator.share && navigator.canShare?.({ files: [new File([blob], "qr-cocktail.png", { type: "image/png" })] })) {
+        try {
+          await navigator.share({
+            files: [new File([blob], "qr-cocktail.png", { type: "image/png" })],
+            title: "QR Carta Digital",
+          });
+          return;
+        } catch { /* usuario canceló */ }
+      }
+
+      // Fallback desktop
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
