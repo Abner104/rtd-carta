@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../../../lib/supabaseClient";
-import { Save, ImagePlus, CheckCircle, QrCode, Download } from "lucide-react";
+import { Save, ImagePlus, CheckCircle, QrCode, Download, FileText } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
+import { jsPDF } from "jspdf";
 
 function Toast({ message, onDone }) {
   useEffect(() => {
@@ -29,6 +30,51 @@ export default function SettingsPage() {
   const [qrModal, setQrModal] = useState(null); // dataUrl para mostrar en modal
   const qrRef = useRef(null);
   const menuUrl = window.location.origin + "/";
+
+  function downloadPDF() {
+    const qrCanvas = qrRef.current?.querySelector("canvas");
+    if (!qrCanvas) return;
+
+    const dataUrl = qrCanvas.toDataURL("image/png");
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+
+    // Fondo negro
+    pdf.setFillColor(10, 10, 10);
+    pdf.rect(0, 0, pageW, pageH, "F");
+
+    // Título
+    pdf.setTextColor(primary);
+    pdf.setFontSize(22);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(settings.business_name || "RTD COCKTAILS", pageW / 2, 40, { align: "center" });
+
+    // Subtítulo
+    pdf.setFontSize(11);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text("Escaneá para ver la carta digital", pageW / 2, 50, { align: "center" });
+
+    // QR centrado
+    const qrSize = 100;
+    const qrX = (pageW - qrSize) / 2;
+    pdf.addImage(dataUrl, "PNG", qrX, 65, qrSize, qrSize);
+
+    // URL
+    pdf.setFontSize(9);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(menuUrl, pageW / 2, 175, { align: "center" });
+
+    // Marco decorativo
+    const r = (hex) => parseInt(hex.slice(1, 3), 16);
+    const g = (hex) => parseInt(hex.slice(3, 5), 16);
+    const b = (hex) => parseInt(hex.slice(5, 7), 16);
+    pdf.setDrawColor(r(primary), g(primary), b(primary));
+    pdf.setLineWidth(0.5);
+    pdf.roundedRect(15, 25, pageW - 30, 160, 5, 5);
+
+    pdf.save("qr-carta.pdf");
+  }
 
   function downloadQR() {
     // Crea canvas final con marco decorativo
@@ -394,14 +440,24 @@ export default function SettingsPage() {
           <div className="pointer-events-none absolute -left-8 -bottom-8 h-20 w-20 rounded-full opacity-5" style={{ backgroundColor: primary }} />
         </div>
 
-        <button
-          onClick={downloadQR}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-black transition hover:opacity-80"
-          style={{ backgroundColor: primary }}
-        >
-          <Download size={15} />
-          Descargar QR
-        </button>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            onClick={downloadQR}
+            className="flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-black transition hover:opacity-80"
+            style={{ backgroundColor: primary }}
+          >
+            <Download size={15} />
+            Imagen
+          </button>
+          <button
+            onClick={downloadPDF}
+            className="flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-semibold transition hover:opacity-80"
+            style={{ borderColor: primary, color: primary }}
+          >
+            <FileText size={15} />
+            PDF
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>

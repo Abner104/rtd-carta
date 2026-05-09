@@ -3,7 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
 import { supabase } from "../../../lib/supabaseClient";
-import { Plus, Trash2, ImagePlus, CheckCircle, ChevronDown, FlaskConical, GripVertical } from "lucide-react";
+import { Plus, Trash2, ImagePlus, CheckCircle, ChevronDown, FlaskConical, GripVertical, Pencil, X } from "lucide-react";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
 } from "@dnd-kit/core";
@@ -12,7 +12,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-function SortableProductItem({ product, primary, openVariants, setOpenVariants, toggleProduct, deleteProduct, setToast, loadData }) {
+function SortableProductItem({ product, primary, openVariants, setOpenVariants, toggleProduct, deleteProduct, setToast, loadData, onEdit }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: product.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
@@ -40,6 +40,13 @@ function SortableProductItem({ product, primary, openVariants, setOpenVariants, 
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => onEdit(product)}
+            className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition"
+            style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "#d4d4d8" }}
+          >
+            <Pencil size={14} /> Editar
+          </button>
           <button
             onClick={() => setOpenVariants(openVariants === product.id ? null : product.id)}
             className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition"
@@ -205,8 +212,24 @@ export default function ProductsPage() {
   const [uploading, setUploading] = useState(false);
   const [toast, setToast] = useState(null);
   const [openVariants, setOpenVariants] = useState(null);
+  const [editProduct, setEditProduct] = useState(null); // producto en edición
   const listRef = useRef(null);
   const formRef = useRef(null);
+
+  async function saveEditProduct(e) {
+    e.preventDefault();
+    const { id, name, description, price_500, price_1000, category_id } = editProduct;
+    const { error } = await supabase.from("products").update({
+      name, description,
+      price_500: Number(price_500 || 0),
+      price_1000: Number(price_1000 || 0),
+      category_id,
+    }).eq("id", id);
+    if (error) { setToast("Error al guardar"); return; }
+    setEditProduct(null);
+    await loadData();
+    setToast("Producto actualizado");
+  }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -378,11 +401,71 @@ export default function ProductsPage() {
                 deleteProduct={deleteProduct}
                 setToast={setToast}
                 loadData={loadData}
+                onEdit={setEditProduct}
               />
             ))}
           </div>
         </SortableContext>
       </DndContext>
+
+      {/* Modal edición producto */}
+      <AnimatePresence>
+        {editProduct && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/70" onClick={() => setEditProduct(null)} />
+            <motion.div
+              initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }}
+              className="fixed inset-x-4 top-1/2 z-50 -translate-y-1/2 rounded-2xl border border-zinc-700 bg-zinc-900 p-6 shadow-2xl sm:inset-x-auto sm:left-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2"
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <h3 className="font-bold text-white">Editar producto</h3>
+                <button onClick={() => setEditProduct(null)} className="text-zinc-500 hover:text-white transition"><X size={18} /></button>
+              </div>
+
+              <form onSubmit={saveEditProduct} className="grid gap-3">
+                <select
+                  value={editProduct.category_id || ""}
+                  onChange={(e) => setEditProduct({ ...editProduct, category_id: e.target.value })}
+                  className="rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none"
+                >
+                  <option value="">Sin categoría</option>
+                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+
+                <input value={editProduct.name} onChange={(e) => setEditProduct({ ...editProduct, name: e.target.value })}
+                  placeholder="Nombre *" required
+                  className="rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none" />
+
+                <textarea value={editProduct.description || ""} onChange={(e) => setEditProduct({ ...editProduct, description: e.target.value })}
+                  placeholder="Descripción" rows="2"
+                  className="rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none" />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <input value={editProduct.price_500 || ""} onChange={(e) => setEditProduct({ ...editProduct, price_500: e.target.value })}
+                    placeholder="Precio 500ml" type="number"
+                    className="rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none" />
+                  <input value={editProduct.price_1000 || ""} onChange={(e) => setEditProduct({ ...editProduct, price_1000: e.target.value })}
+                    placeholder="Precio 1L" type="number"
+                    className="rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none" />
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button type="submit"
+                    className="flex-1 rounded-xl py-2.5 font-bold text-black transition hover:opacity-80"
+                    style={{ backgroundColor: primary }}>
+                    Guardar
+                  </button>
+                  <button type="button" onClick={() => setEditProduct(null)}
+                    className="flex-1 rounded-xl border border-zinc-700 py-2.5 text-sm text-zinc-400 transition hover:text-white">
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {toast && <Toast message={toast} onDone={() => setToast(null)} />}

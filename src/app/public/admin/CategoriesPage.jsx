@@ -3,7 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
 import { supabase } from "../../../lib/supabaseClient";
-import { Plus, Trash2, CheckCircle, ImagePlus } from "lucide-react";
+import { Plus, Trash2, CheckCircle, ImagePlus, Pencil, Check, X } from "lucide-react";
 
 function Toast({ message, onDone }) {
   useEffect(() => {
@@ -28,6 +28,15 @@ export default function CategoriesPage() {
   const { primary } = useOutletContext() || { primary: "#c89b4f" };
   const [categories, setCategories] = useState([]);
   const [name, setName] = useState("");
+  const [editing, setEditing] = useState(null); // { id, name }
+
+  async function saveEdit(id) {
+    if (!editing?.name?.trim()) return;
+    await supabase.from("categories").update({ name: editing.name }).eq("id", id);
+    setEditing(null);
+    await loadCategories();
+    setToast("Nombre actualizado");
+  }
   const [toast, setToast] = useState(null);
   const listRef = useRef(null);
 
@@ -114,7 +123,26 @@ export default function CategoriesPage() {
                 <img src={category.banner_url} alt={category.name} className="h-12 w-20 rounded-lg object-cover" />
               )}
               <div>
-                <h3 className="text-lg font-semibold">{category.name}</h3>
+                {editing?.id === category.id ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      value={editing.name}
+                      onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                      onKeyDown={(e) => { if (e.key === "Enter") saveEdit(category.id); if (e.key === "Escape") setEditing(null); }}
+                      className="rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm text-white outline-none"
+                    />
+                    <button onClick={() => saveEdit(category.id)} className="text-green-400 hover:text-green-300 transition"><Check size={16} /></button>
+                    <button onClick={() => setEditing(null)} className="text-zinc-500 hover:text-zinc-300 transition"><X size={16} /></button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold">{category.name}</h3>
+                    <button onClick={() => setEditing({ id: category.id, name: category.name })} className="text-zinc-600 hover:text-zinc-300 transition">
+                      <Pencil size={14} />
+                    </button>
+                  </div>
+                )}
                 <p className={`mt-0.5 text-sm ${category.active ? "text-green-400" : "text-red-400"}`}>
                   {category.active ? "Activa" : "Desactivada"}
                 </p>
