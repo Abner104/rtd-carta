@@ -5,6 +5,7 @@ import { supabase } from "../../../lib/supabaseClient";
 import { Save, ImagePlus, CheckCircle, QrCode, Download, FileText } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { jsPDF } from "jspdf";
+import QRCode from "qrcode";
 
 function Toast({ message, onDone }) {
   useEffect(() => {
@@ -31,59 +32,66 @@ export default function SettingsPage() {
   const qrRef = useRef(null);
   const menuUrl = window.location.origin + "/";
 
-  function downloadPDF() {
-    const qrCanvas = qrRef.current?.querySelector("canvas");
-    if (!qrCanvas) return;
+  async function generarQRDataUrl() {
+    return await QRCode.toDataURL(menuUrl, {
+      width: 300,
+      margin: 2,
+      color: { dark: primary, light: "#0a0a0a" },
+      errorCorrectionLevel: "H",
+    });
+  }
 
-    const dataUrl = qrCanvas.toDataURL("image/png");
+  async function downloadPDF() {
+    const qrDataUrl = await generarQRDataUrl();
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
 
     // Fondo negro
     pdf.setFillColor(10, 10, 10);
-    pdf.rect(0, 0, pageW, pageH, "F");
+    pdf.rect(0, 0, pageW, pdf.internal.pageSize.getHeight(), "F");
+
+    // Marco
+    const rr = parseInt(primary.slice(1, 3), 16);
+    const gg = parseInt(primary.slice(3, 5), 16);
+    const bb = parseInt(primary.slice(5, 7), 16);
+    pdf.setDrawColor(rr, gg, bb);
+    pdf.setLineWidth(0.5);
+    pdf.roundedRect(15, 20, pageW - 30, 165, 5, 5);
 
     // Título
-    pdf.setTextColor(primary);
-    pdf.setFontSize(22);
+    pdf.setTextColor(rr, gg, bb);
+    pdf.setFontSize(20);
     pdf.setFont("helvetica", "bold");
-    pdf.text(settings.business_name || "RTD COCKTAILS", pageW / 2, 40, { align: "center" });
+    pdf.text(settings.business_name || "RTD COCKTAILS", pageW / 2, 38, { align: "center" });
 
     // Subtítulo
-    pdf.setFontSize(11);
-    pdf.setTextColor(150, 150, 150);
-    pdf.text("Escaneá para ver la carta digital", pageW / 2, 50, { align: "center" });
+    pdf.setFontSize(10);
+    pdf.setTextColor(120, 120, 120);
+    pdf.text("Escaneá para ver la carta digital", pageW / 2, 47, { align: "center" });
 
-    // QR centrado
+    // QR
     const qrSize = 100;
-    const qrX = (pageW - qrSize) / 2;
-    pdf.addImage(dataUrl, "PNG", qrX, 65, qrSize, qrSize);
+    pdf.addImage(qrDataUrl, "PNG", (pageW - qrSize) / 2, 58, qrSize, qrSize);
 
     // URL
-    pdf.setFontSize(9);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text(menuUrl, pageW / 2, 175, { align: "center" });
-
-    // Marco decorativo
-    const r = (hex) => parseInt(hex.slice(1, 3), 16);
-    const g = (hex) => parseInt(hex.slice(3, 5), 16);
-    const b = (hex) => parseInt(hex.slice(5, 7), 16);
-    pdf.setDrawColor(r(primary), g(primary), b(primary));
-    pdf.setLineWidth(0.5);
-    pdf.roundedRect(15, 25, pageW - 30, 160, 5, 5);
+    pdf.setFontSize(8);
+    pdf.setTextColor(80, 80, 80);
+    pdf.text(menuUrl, pageW / 2, 168, { align: "center" });
 
     pdf.save("qr-carta.pdf");
   }
 
-  function downloadQR() {
-    // Crea canvas final con marco decorativo
-    const qrCanvas = qrRef.current?.querySelector("canvas");
-    if (!qrCanvas) return;
+  async function downloadQR() {
+    const qrDataUrl = await generarQRDataUrl();
+
+    // Canvas con marco decorativo
+    const img = new Image();
+    img.src = qrDataUrl;
+    await new Promise((res) => { img.onload = res; });
 
     const pad = 32;
-    const footerH = 56;
-    const size = qrCanvas.width;
+    const footerH = 60;
+    const size = img.width;
     const total = size + pad * 2;
 
     const out = document.createElement("canvas");
@@ -91,56 +99,37 @@ export default function SettingsPage() {
     out.height = total + footerH;
     const ctx = out.getContext("2d");
 
-    // Fondo oscuro
     ctx.fillStyle = "#0a0a0a";
-    ctx.roundRect(0, 0, out.width, out.height, 20);
-    ctx.fill();
+    ctx.fillRect(0, 0, out.width, out.height);
 
-    // Borde decorativo
-    ctx.strokeStyle = primary + "66";
-    ctx.lineWidth = 1.5;
-    ctx.roundRect(6, 6, out.width - 12, out.height - 12, 16);
-    ctx.stroke();
-
-    // Esquinas estilo cóctel
-    const corner = 18;
+    // Esquinas
+    const corner = 20;
     ctx.strokeStyle = primary;
     ctx.lineWidth = 3;
     ctx.lineCap = "round";
-    [[8, 8], [out.width - 8, 8], [8, out.height - 8], [out.width - 8, out.height - 8]].forEach(([x, y]) => {
+    [[10, 10], [out.width - 10, 10], [10, out.height - 10], [out.width - 10, out.height - 10]].forEach(([x, y]) => {
       const dx = x < out.width / 2 ? 1 : -1;
       const dy = y < out.height / 2 ? 1 : -1;
       ctx.beginPath(); ctx.moveTo(x + dx * corner, y); ctx.lineTo(x, y); ctx.lineTo(x, y + dy * corner); ctx.stroke();
     });
 
-    // QR
-    ctx.drawImage(qrCanvas, pad, pad);
+    ctx.drawImage(img, pad, pad);
 
-    // Footer
-    ctx.fillStyle = primary + "22";
+    ctx.fillStyle = primary + "20";
     ctx.fillRect(0, total, out.width, footerH);
     ctx.fillStyle = primary;
-    ctx.font = "bold 13px sans-serif";
+    ctx.font = "bold 14px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(settings.business_name || "RTD COCKTAILS", out.width / 2, total + 22);
-    ctx.fillStyle = "#ffffff66";
-    ctx.font = "10px sans-serif";
-    ctx.fillText("Escaneá para ver la carta", out.width / 2, total + 40);
+    ctx.fillText(settings.business_name || "RTD COCKTAILS", out.width / 2, total + 24);
+    ctx.fillStyle = "#ffffff55";
+    ctx.font = "11px sans-serif";
+    ctx.fillText("Escaneá para ver la carta", out.width / 2, total + 44);
 
-    const dataUrl = out.toDataURL("image/png");
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      // Muestra modal con la imagen para que el usuario la guarde con presión larga
-      setQrModal(dataUrl);
-    } else {
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = "qr-cocktail.png";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }
+    // Descarga como PNG
+    const link = document.createElement("a");
+    link.download = "qr-cocktail.png";
+    link.href = out.toDataURL("image/png");
+    link.click();
   }
   const [settings, setSettings] = useState({
     business_name: "",
