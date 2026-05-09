@@ -423,38 +423,65 @@ export default function ProductsPage() {
                 <button onClick={() => setEditProduct(null)} className="text-zinc-500 hover:text-white transition"><X size={18} /></button>
               </div>
 
-              <form onSubmit={saveEditProduct} className="grid gap-3">
-                <select
-                  value={editProduct.category_id || ""}
-                  onChange={(e) => setEditProduct({ ...editProduct, category_id: e.target.value })}
-                  className="rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none"
-                >
-                  <option value="">Sin categoría</option>
-                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+              <form onSubmit={saveEditProduct} className="grid gap-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-400">Categoría</label>
+                  <select
+                    value={editProduct.category_id || ""}
+                    onChange={(e) => setEditProduct({ ...editProduct, category_id: e.target.value })}
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
+                  >
+                    <option value="">Sin categoría</option>
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
 
-                <input value={editProduct.name} onChange={(e) => setEditProduct({ ...editProduct, name: e.target.value })}
-                  placeholder="Nombre *" required
-                  className="rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none" />
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-400">Nombre *</label>
+                  <input
+                    value={editProduct.name || ""}
+                    onChange={(e) => setEditProduct({ ...editProduct, name: e.target.value })}
+                    required
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
+                  />
+                </div>
 
-                <textarea value={editProduct.description || ""} onChange={(e) => setEditProduct({ ...editProduct, description: e.target.value })}
-                  placeholder="Descripción" rows="2"
-                  className="rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none" />
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-400">Descripción / ingredientes</label>
+                  <textarea
+                    value={editProduct.description || ""}
+                    onChange={(e) => setEditProduct({ ...editProduct, description: e.target.value })}
+                    rows="2"
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
+                  />
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <input value={editProduct.price_500 || ""} onChange={(e) => setEditProduct({ ...editProduct, price_500: e.target.value })}
-                    placeholder="Precio 500ml" type="number"
-                    className="rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none" />
-                  <input value={editProduct.price_1000 || ""} onChange={(e) => setEditProduct({ ...editProduct, price_1000: e.target.value })}
-                    placeholder="Precio 1L" type="number"
-                    className="rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none" />
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-zinc-400">Precio 500ml</label>
+                    <input
+                      value={editProduct.price_500 ?? ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, price_500: e.target.value })}
+                      type="number" min="0"
+                      className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-zinc-400">Precio 1 litro</label>
+                    <input
+                      value={editProduct.price_1000 ?? ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, price_1000: e.target.value })}
+                      type="number" min="0"
+                      className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex gap-2 pt-1">
                   <button type="submit"
                     className="flex-1 rounded-xl py-2.5 font-bold text-black transition hover:opacity-80"
                     style={{ backgroundColor: primary }}>
-                    Guardar
+                    Guardar cambios
                   </button>
                   <button type="button" onClick={() => setEditProduct(null)}
                     className="flex-1 rounded-xl border border-zinc-700 py-2.5 text-sm text-zinc-400 transition hover:text-white">
