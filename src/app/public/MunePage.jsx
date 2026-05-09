@@ -1,32 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
-import { Wine, Clock, AtSign, ChevronDown, Menu, X, Search, Sun, Moon } from "lucide-react";
+import { Wine, Clock, AtSign, Menu, X, Search, Sun, Moon } from "lucide-react";
 import { useTheme } from "../../lib/useTheme";
 import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
 import BartenderLoader from "../../components/menu/BartenderLoader";
 
-function ProductCard({ product, primary }) {
-  const [open, setOpen] = useState(false);
-  const [variants, setVariants] = useState(null);
-
-  async function handleToggle() {
-    if (!open && variants === null) {
-      const { data } = await supabase
-        .from("product_variants")
-        .select("*")
-        .eq("product_id", product.id)
-        .order("sort_order");
-      setVariants(data || []);
-    }
-    setOpen((v) => !v);
-  }
+function ProductCard({ product, primary, variants }) {
+  const hasVariants = variants && variants.length > 0;
 
   return (
-    <div className="border-b" style={{ borderColor: `${primary}18` }}>
-      <button onClick={handleToggle} className="flex w-full items-start gap-4 py-5 text-left sm:gap-5">
+    <div className="border-b py-5" style={{ borderColor: `${primary}18` }}>
+      <div className="flex items-start gap-4 sm:gap-5">
+        {/* Imagen */}
         <div
-          className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl transition-transform duration-300 hover:scale-105 sm:h-16 sm:w-16 md:h-20 md:w-20"
+          className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl sm:h-16 sm:w-16 md:h-20 md:w-20"
           style={{ backgroundColor: `${primary}15`, color: primary }}
         >
           {product.image_url
@@ -35,51 +23,53 @@ function ProductCard({ product, primary }) {
           }
         </div>
 
-        <div className="flex flex-1 flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+        {/* Info */}
+        <div className="flex flex-1 flex-col sm:flex-row sm:items-start sm:justify-between">
           <div className="pl-3 sm:pl-4" style={{ borderLeft: `2px solid ${primary}40` }}>
+            {/* Nombre + badges */}
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base font-black uppercase tracking-[0.12em] sm:text-lg md:text-xl">{product.name}</h3>
               {product.badge === "nuevo" && (
-                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ backgroundColor: `${primary}30`, color: primary }}>
-                  Nuevo
-                </span>
+                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ backgroundColor: `${primary}30`, color: primary }}>Nuevo</span>
               )}
               {product.badge === "popular" && (
-                <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-orange-400">
-                  🔥 Popular
-                </span>
+                <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-orange-400">🔥 Popular</span>
               )}
-              <ChevronDown size={15} className="flex-shrink-0 transition-transform duration-300" style={{ color: primary, transform: open ? "rotate(180deg)" : "rotate(0deg)" }} />
             </div>
+
+            {/* Descripción */}
             <p className="mt-1 text-xs text-zinc-400 sm:text-sm md:max-w-sm">{product.description}</p>
+
+            {/* Sabores siempre visibles */}
+            {hasVariants && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {variants.map((v) => (
+                  <div key={v.id} className="rounded-lg px-3 py-1.5" style={{ backgroundColor: `${primary}15`, border: `1px solid ${primary}30` }}>
+                    <span className="text-xs font-semibold capitalize" style={{ color: primary }}>{v.name}</span>
+                    {v.price_500 > 0 && (
+                      <span className="ml-2 text-xs text-zinc-400">${Number(v.price_500).toLocaleString("es-CL")}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="mt-2 flex gap-3 pl-3 sm:mt-0 sm:flex-col sm:items-end sm:gap-1 sm:pl-0">
-            {product.price_500 > 0 && <p className="text-base font-bold sm:text-lg" style={{ color: primary }}>500ml · ${Number(product.price_500).toLocaleString("es-CL")}</p>}
-            {product.price_1000 > 0 && <p className="text-xs text-zinc-400 sm:text-sm">1L · ${Number(product.price_1000).toLocaleString("es-CL")}</p>}
-          </div>
-        </div>
-      </button>
-
-      <AnimatePresence>
-        {open && variants && variants.length > 0 && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: "easeInOut" }}
-            className="overflow-hidden"
-          >
-            <div className="mb-4 ml-[4.5rem] grid grid-cols-2 gap-2 rounded-xl p-3 sm:grid-cols-3" style={{ backgroundColor: `${primary}0d` }}>
-              {variants.map((v) => (
-                <div key={v.id} className="flex flex-col gap-1 rounded-lg px-3 py-2" style={{ backgroundColor: `${primary}15` }}>
-                  <span className="text-sm font-semibold capitalize" style={{ color: primary }}>{v.name}</span>
-                  {v.price_500 > 0 && <span className="text-xs text-zinc-300">500ml · ${Number(v.price_500).toLocaleString("es-CL")}</span>}
-                  {v.price_1000 > 0 && <span className="text-xs text-zinc-400">1L · ${Number(v.price_1000).toLocaleString("es-CL")}</span>}
-                </div>
-              ))}
+          {/* Precios — solo si no hay variantes con precio propio */}
+          {!hasVariants && (
+            <div className="mt-2 flex gap-3 pl-3 sm:mt-0 sm:flex-col sm:items-end sm:gap-1 sm:pl-0">
+              {product.price_500 > 0 && <p className="text-base font-bold sm:text-lg" style={{ color: primary }}>500ml · ${Number(product.price_500).toLocaleString("es-CL")}</p>}
+              {product.price_1000 > 0 && <p className="text-xs text-zinc-400 sm:text-sm">1L · ${Number(product.price_1000).toLocaleString("es-CL")}</p>}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+          {hasVariants && (
+            <div className="mt-2 pl-3 sm:mt-0 sm:pl-0 sm:text-right">
+              {product.price_500 > 0 && <p className="text-base font-bold sm:text-lg" style={{ color: primary }}>500ml · ${Number(product.price_500).toLocaleString("es-CL")}</p>}
+              {product.price_1000 > 0 && <p className="text-xs text-zinc-400 sm:text-sm">1L · ${Number(product.price_1000).toLocaleString("es-CL")}</p>}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -105,6 +95,7 @@ export default function MenuPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [promotions, setPromotions] = useState([]);
+  const [variantsMap, setVariantsMap] = useState({});
 
   const [loaderColors] = useState(getCachedColors);
   const { dark, toggle: toggleTheme, bg: themeBg, surface, text, textMuted } = useTheme(settings?.primary_color);
@@ -129,16 +120,24 @@ export default function MenuPage() {
   }, []);
 
   async function loadData() {
-    const [{ data: s }, { data: c }, { data: p }, { data: promo }] = await Promise.all([
+    const [{ data: s }, { data: c }, { data: p }, { data: promo }, { data: vars }] = await Promise.all([
       supabase.from("settings").select("*").limit(1).maybeSingle(),
       supabase.from("categories").select("*").eq("active", true).order("sort_order"),
       supabase.from("products").select("*, categories(name)").eq("active", true).order("sort_order"),
       supabase.from("promotions").select("*").eq("active", true).order("sort_order"),
+      supabase.from("product_variants").select("*").order("sort_order"),
     ]);
     setSettings(s || null);
     setCategories(c || []);
     setProducts(p || []);
     setPromotions(promo || []);
+    // Agrupa variantes por product_id
+    const map = {};
+    (vars || []).forEach((v) => {
+      if (!map[v.product_id]) map[v.product_id] = [];
+      map[v.product_id].push(v);
+    });
+    setVariantsMap(map);
     setActiveCategory(c?.[0]?.id || null);
 
     // Guarda colores en cache para el próximo loading
@@ -501,7 +500,7 @@ export default function MenuPage() {
                   searchResults.map((product, index) => (
                     <motion.div key={product.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04 }}>
                       <p className="mb-1 text-xs" style={{ color: primary }}>{product.categories?.name}</p>
-                      <ProductCard product={product} primary={primary} />
+                      <ProductCard product={product} primary={primary} variants={variantsMap[product.id] || []} />
                     </motion.div>
                   ))
                 )}
@@ -548,7 +547,7 @@ export default function MenuPage() {
                           viewport={{ once: true }}
                           transition={{ delay: index * 0.05, duration: 0.3 }}
                         >
-                          <ProductCard product={product} primary={primary} />
+                          <ProductCard product={product} primary={primary} variants={variantsMap[product.id] || []} />
                         </motion.div>
                       ))}
                     </div>
