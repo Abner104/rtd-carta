@@ -26,6 +26,7 @@ function Toast({ message, onDone }) {
 export default function SettingsPage() {
   const { primary } = useOutletContext() || { primary: "#c89b4f" };
   const [toast, setToast] = useState(null);
+  const [qrModal, setQrModal] = useState(null); // dataUrl para mostrar en modal
   const qrRef = useRef(null);
   const menuUrl = window.location.origin + "/";
 
@@ -80,28 +81,20 @@ export default function SettingsPage() {
     ctx.font = "10px sans-serif";
     ctx.fillText("Escaneá para ver la carta", out.width / 2, total + 40);
 
-    out.toBlob(async (blob) => {
-      // Web Share API — funciona en iOS Safari y Android Chrome
-      if (navigator.share && navigator.canShare?.({ files: [new File([blob], "qr-cocktail.png", { type: "image/png" })] })) {
-        try {
-          await navigator.share({
-            files: [new File([blob], "qr-cocktail.png", { type: "image/png" })],
-            title: "QR Carta Digital",
-          });
-          return;
-        } catch { /* usuario canceló */ }
-      }
+    const dataUrl = out.toDataURL("image/png");
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-      // Fallback desktop
-      const url = URL.createObjectURL(blob);
+    if (isMobile) {
+      // Muestra modal con la imagen para que el usuario la guarde con presión larga
+      setQrModal(dataUrl);
+    } else {
       const a = document.createElement("a");
-      a.href = url;
+      a.href = dataUrl;
       a.download = "qr-cocktail.png";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }, "image/png");
+    }
   }
   const [settings, setSettings] = useState({
     business_name: "",
@@ -413,6 +406,37 @@ export default function SettingsPage() {
 
       <AnimatePresence>
         {toast && <Toast message={toast} onDone={() => setToast(null)} />}
+      </AnimatePresence>
+
+      {/* Modal QR mobile */}
+      <AnimatePresence>
+        {qrModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/80"
+              onClick={() => setQrModal(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="fixed inset-x-4 top-1/2 z-50 -translate-y-1/2 rounded-2xl bg-zinc-900 p-5 shadow-2xl"
+            >
+              <p className="mb-3 text-center text-sm font-semibold text-white">
+                Mantenga presionada la imagen para guardarla
+              </p>
+              <img src={qrModal} alt="QR" className="w-full rounded-xl" />
+              <button
+                onClick={() => setQrModal(null)}
+                className="mt-4 w-full rounded-xl py-2.5 text-sm font-semibold text-black transition hover:opacity-80"
+                style={{ backgroundColor: primary }}
+              >
+                Cerrar
+              </button>
+            </motion.div>
+          </>
+        )}
       </AnimatePresence>
     </main>
   );
