@@ -218,12 +218,22 @@ export default function ProductsPage() {
 
   async function saveEditProduct(e) {
     e.preventDefault();
-    const { id, name, description, price_500, price_1000, category_id } = editProduct;
+    const { id, name, description, price_500, price_1000, category_id, image_url } = editProduct;
+
+    let finalImageUrl = image_url;
+
+    // Si hay archivo nuevo, subirlo
+    const fileInput = e.target.querySelector('input[type="file"]');
+    if (fileInput?.files?.[0]) {
+      finalImageUrl = await uploadImage(fileInput.files[0]);
+    }
+
     const { error } = await supabase.from("products").update({
       name, description,
       price_500: Number(price_500 || 0),
       price_1000: Number(price_1000 || 0),
       category_id,
+      image_url: finalImageUrl,
     }).eq("id", id);
     if (error) { setToast("Error al guardar"); return; }
     setEditProduct(null);
@@ -474,6 +484,26 @@ export default function ProductsPage() {
                       type="number" min="0"
                       className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
                     />
+                  </div>
+                </div>
+
+                {/* Imagen */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-400">Imagen</label>
+                  <div className="flex items-center gap-3">
+                    {editProduct.image_url ? (
+                      <img src={editProduct.image_url} alt="img" className="h-14 w-14 flex-shrink-0 rounded-xl object-cover" />
+                    ) : (
+                      <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-zinc-600">
+                        <ImagePlus size={20} />
+                      </div>
+                    )}
+                    <label className="flex flex-1 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-zinc-700 px-4 py-3 text-sm text-zinc-400 transition hover:border-zinc-500 hover:text-zinc-200"
+                      style={{ borderColor: `${primary}44` }}>
+                      <ImagePlus size={16} style={{ color: primary }} />
+                      {editProduct.image_url ? "Cambiar imagen" : "Subir imagen"}
+                      <input type="file" accept="image/*" className="hidden" />
+                    </label>
                   </div>
                 </div>
 
