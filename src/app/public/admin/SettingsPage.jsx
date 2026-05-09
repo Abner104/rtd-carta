@@ -80,19 +80,16 @@ export default function SettingsPage() {
     ctx.font = "10px sans-serif";
     ctx.fillText("Escaneá para ver la carta", out.width / 2, total + 40);
 
-    const dataUrl = out.toDataURL("image/png");
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      // En mobile abre en nueva pestaña para que el usuario guarde manualmente
-      const win = window.open();
-      win.document.write(`<img src="${dataUrl}" style="max-width:100%" /><p style="font-family:sans-serif;text-align:center;color:#888;font-size:12px">Mantenga presionada la imagen para guardar</p>`);
-    } else {
+    out.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = dataUrl;
+      a.href = url;
       a.download = "qr-cocktail.png";
+      document.body.appendChild(a);
       a.click();
-    }
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }, "image/png");
   }
   const [settings, setSettings] = useState({
     business_name: "",
@@ -398,7 +395,7 @@ export default function SettingsPage() {
           style={{ backgroundColor: primary }}
         >
           <Download size={15} />
-          {/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? "Ver QR para guardar" : "Descargar QR"}
+          Descargar QR
         </button>
       </div>
 
