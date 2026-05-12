@@ -50,7 +50,7 @@ function ProductCard({ product, primary, variants }) {
                       <span className="ml-2 text-xs text-zinc-400">500ml ${Number(v.price_500).toLocaleString("es-CL")}</span>
                     )}
                     {v.price_1000 > 0 && (
-                      <span className="ml-1.5 text-xs text-zinc-500">· 1L ${Number(v.price_1000).toLocaleString("es-CL")}</span>
+                      <span className="ml-1.5 text-xs text-zinc-300">· 1L ${Number(v.price_1000).toLocaleString("es-CL")}</span>
                     )}
                   </div>
                 ))}
