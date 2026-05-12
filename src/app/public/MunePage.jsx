@@ -47,7 +47,10 @@ function ProductCard({ product, primary, variants }) {
                   <div key={v.id} className="rounded-lg px-3 py-1.5" style={{ backgroundColor: `${primary}15`, border: `1px solid ${primary}30` }}>
                     <span className="text-xs font-semibold capitalize" style={{ color: primary }}>{v.name}</span>
                     {v.price_500 > 0 && (
-                      <span className="ml-2 text-xs text-zinc-400">${Number(v.price_500).toLocaleString("es-CL")}</span>
+                      <span className="ml-2 text-xs text-zinc-400">500ml ${Number(v.price_500).toLocaleString("es-CL")}</span>
+                    )}
+                    {v.price_1000 > 0 && (
+                      <span className="ml-1.5 text-xs text-zinc-500">· 1L ${Number(v.price_1000).toLocaleString("es-CL")}</span>
                     )}
                   </div>
                 ))}
