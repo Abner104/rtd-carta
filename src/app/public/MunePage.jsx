@@ -55,19 +55,11 @@ function ProductCard({ product, primary, variants }) {
             )}
           </div>
 
-          {/* Precios — solo si no hay variantes con precio propio */}
-          {!hasVariants && (
-            <div className="mt-2 flex gap-3 pl-3 sm:mt-0 sm:flex-col sm:items-end sm:gap-1 sm:pl-0">
-              {product.price_500 > 0 && <p className="text-base font-bold sm:text-lg" style={{ color: primary }}>500ml · ${Number(product.price_500).toLocaleString("es-CL")}</p>}
-              {product.price_1000 > 0 && <p className="text-xs text-zinc-400 sm:text-sm">1L · ${Number(product.price_1000).toLocaleString("es-CL")}</p>}
-            </div>
-          )}
-          {hasVariants && (
-            <div className="mt-2 pl-3 sm:mt-0 sm:pl-0 sm:text-right">
-              {product.price_500 > 0 && <p className="text-base font-bold sm:text-lg" style={{ color: primary }}>500ml · ${Number(product.price_500).toLocaleString("es-CL")}</p>}
-              {product.price_1000 > 0 && <p className="text-xs text-zinc-400 sm:text-sm">1L · ${Number(product.price_1000).toLocaleString("es-CL")}</p>}
-            </div>
-          )}
+          {/* Precios */}
+          <div className="mt-2 flex gap-3 pl-3 sm:mt-0 sm:flex-col sm:items-end sm:gap-1 sm:pl-0">
+            {product.price_500 > 0 && <p className="text-base font-bold sm:text-lg" style={{ color: primary }}>500ml · ${Number(product.price_500).toLocaleString("es-CL")}</p>}
+            {product.price_1000 > 0 && <p className="text-xs text-zinc-400 sm:text-sm">1L · ${Number(product.price_1000).toLocaleString("es-CL")}</p>}
+          </div>
         </div>
       </div>
     </div>
