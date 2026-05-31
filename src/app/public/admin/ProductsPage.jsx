@@ -336,21 +336,16 @@ export default function ProductsPage() {
 
   async function saveEditProduct(e) {
     e.preventDefault();
-    const { id, name, description, price_500, price_1000, category_id, image_url } = editProduct;
+    const { id, name, description, category_id, image_url } = editProduct;
 
     let finalImageUrl = image_url;
-
-    // Si hay archivo nuevo, subirlo
     const fileInput = e.target.querySelector('input[type="file"]');
     if (fileInput?.files?.[0]) {
       finalImageUrl = await uploadImage(fileInput.files[0]);
     }
 
     const { error } = await supabase.from("products").update({
-      name, description,
-      price_500: Number(price_500 || 0),
-      price_1000: Number(price_1000 || 0),
-      category_id,
+      name, description, category_id,
       image_url: finalImageUrl,
     }).eq("id", id);
     if (error) { setToast("Error al guardar"); return; }
@@ -641,7 +636,7 @@ export default function ProductsPage() {
               className="fixed inset-0 z-50 bg-black/70" onClick={() => setEditProduct(null)} />
             <motion.div
               initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
-              className="fixed bottom-0 left-0 right-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-2xl border-t border-zinc-700 bg-zinc-900 p-6 shadow-2xl sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-screen sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border"
+              className="fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-zinc-700 bg-zinc-900 p-6 shadow-2xl"
             >
               <div className="mb-5 flex items-center justify-between">
                 <h3 className="font-bold text-white">Editar producto</h3>
@@ -679,27 +674,6 @@ export default function ProductsPage() {
                     rows="2"
                     className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
                   />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-zinc-400">Precio 500ml</label>
-                    <input
-                      value={editProduct.price_500 ?? ""}
-                      onChange={(e) => setEditProduct({ ...editProduct, price_500: e.target.value })}
-                      type="number" min="0"
-                      className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-zinc-400">Precio 1 litro</label>
-                    <input
-                      value={editProduct.price_1000 ?? ""}
-                      onChange={(e) => setEditProduct({ ...editProduct, price_1000: e.target.value })}
-                      type="number" min="0"
-                      className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
-                    />
-                  </div>
                 </div>
 
                 {/* Precios */}
