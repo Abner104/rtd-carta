@@ -329,7 +329,8 @@ export default function ProductsPage() {
     const { data } = await supabase.from("product_prices").select("*").eq("product_id", product.id).order("sort_order");
     setEditPrices(data?.length > 0 ? data : [{ label: "", price: "" }]);
     setEditProduct(product);
-  } // producto en edición
+  }
+
   const listRef = useRef(null);
   const formRef = useRef(null);
 
