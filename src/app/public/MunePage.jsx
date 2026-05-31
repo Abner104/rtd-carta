@@ -49,12 +49,6 @@ function ProductCard({ product, primary, variants, prices }) {
                 {variants.map((v) => (
                   <div key={v.id} className="rounded-lg px-3 py-1.5" style={{ backgroundColor: `${primary}15`, border: `1px solid ${primary}30` }}>
                     <span className="text-xs font-semibold capitalize" style={{ color: primary }}>{v.name}</span>
-                    {v.price_500 > 0 && (
-                      <span className="ml-2 text-xs text-zinc-400">500ml ${Number(v.price_500).toLocaleString("es-CL")}</span>
-                    )}
-                    {v.price_1000 > 0 && (
-                      <span className="ml-1.5 text-xs text-zinc-300">· 1L ${Number(v.price_1000).toLocaleString("es-CL")}</span>
-                    )}
                   </div>
                 ))}
               </div>
@@ -65,16 +59,14 @@ function ProductCard({ product, primary, variants, prices }) {
           <div className="mt-2 flex gap-3 pl-3 sm:mt-0 sm:flex-col sm:items-end sm:gap-1 sm:pl-0">
             {hasCustomPrices ? (
               prices.map((p, i) => (
-                <p key={p.id} className={i === 0 ? "text-base font-bold sm:text-lg" : "text-xs text-zinc-400 sm:text-sm"} style={i === 0 ? { color: primary } : {}}>
+                <p key={p.id}
+                  className={i === 0 ? "text-base font-bold sm:text-lg" : "text-sm text-zinc-400"}
+                  style={i === 0 ? { color: primary } : {}}
+                >
                   {p.label} · ${Number(p.price).toLocaleString("es-CL")}
                 </p>
               ))
-            ) : (
-              <>
-                {product.price_500 > 0 && <p className="text-base font-bold sm:text-lg" style={{ color: primary }}>500ml · ${Number(product.price_500).toLocaleString("es-CL")}</p>}
-                {product.price_1000 > 0 && <p className="text-xs text-zinc-400 sm:text-sm">1L · ${Number(product.price_1000).toLocaleString("es-CL")}</p>}
-              </>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
