@@ -3,7 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
 import { supabase } from "../../../lib/supabaseClient";
-import { Plus, Trash2, ImagePlus, CheckCircle, ChevronDown, FlaskConical, GripVertical, Pencil, X } from "lucide-react";
+import { Plus, Trash2, ImagePlus, CheckCircle, ChevronDown, FlaskConical, GripVertical, Pencil, X, Copy, Search } from "lucide-react";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
 } from "@dnd-kit/core";
@@ -12,7 +12,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-function SortableProductItem({ product, primary, openVariants, setOpenVariants, openPrices, setOpenPrices, toggleProduct, deleteProduct, setToast, loadData, onEdit }) {
+function SortableProductItem({ product, primary, openVariants, setOpenVariants, openPrices, setOpenPrices, toggleProduct, deleteProduct, setToast, loadData, onEdit, onDuplicate }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: product.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
@@ -46,6 +46,14 @@ function SortableProductItem({ product, primary, openVariants, setOpenVariants, 
             style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "#d4d4d8" }}
           >
             <Pencil size={14} /> Editar
+          </button>
+          <button
+            onClick={() => onDuplicate(product)}
+            className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition"
+            style={{ backgroundColor: "rgba(255,255,255,0.04)", color: "#a1a1aa" }}
+            title="Duplicar producto"
+          >
+            <Copy size={14} />
           </button>
           <button
             onClick={() => setOpenPrices(openPrices === product.id ? null : product.id)}
@@ -321,7 +329,8 @@ export default function ProductsPage() {
   const [toast, setToast] = useState(null);
   const [openVariants, setOpenVariants] = useState(null);
   const [openPrices, setOpenPrices] = useState(null);
-  const [editProduct, setEditProduct] = useState(null); // producto en edición
+  const [editProduct, setEditProduct] = useState(null);
+  const [search, setSearch] = useState(""); // producto en edición
   const listRef = useRef(null);
   const formRef = useRef(null);
 
@@ -445,6 +454,17 @@ export default function ProductsPage() {
     setToast("Producto eliminado");
   }
 
+  async function duplicateProduct(product) {
+    const { id, categories, created_at, ...rest } = product;
+    await supabase.from("products").insert({
+      ...rest,
+      name: `${product.name} (copia)`,
+      sort_order: products.length + 1,
+    });
+    await loadData();
+    setToast(`"${product.name}" duplicado`);
+  }
+
   async function toggleProduct(id, active) {
     await supabase.from("products").update({ active: !active }).eq("id", id);
     await loadData();
@@ -453,9 +473,11 @@ export default function ProductsPage() {
 
   return (
     <div>
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold" style={{ color: primary }}>Productos</h1>
-        <p className="mt-1 text-zinc-400">Administra los tragos de la carta</p>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold" style={{ color: primary }}>Productos</h1>
+          <p className="mt-1 text-zinc-400">{products.length} productos en total</p>
+        </div>
       </motion.div>
 
       <form ref={formRef} onSubmit={createProduct} className="mt-8 grid gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
@@ -506,10 +528,22 @@ export default function ProductsPage() {
         </button>
       </form>
 
+      {/* Búsqueda */}
+      <div className="mt-4 flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2.5">
+        <Search size={14} className="flex-shrink-0 text-zinc-600" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar producto..."
+          className="flex-1 bg-transparent text-sm text-white outline-none placeholder-zinc-600"
+        />
+        {search && <button onClick={() => setSearch("")} className="text-zinc-600 hover:text-zinc-300 transition"><X size={13} /></button>}
+      </div>
+
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={products.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-          <div ref={listRef} className="mt-8 grid gap-4">
-            {products.map((product) => (
+          <div ref={listRef} className="mt-4 grid gap-4">
+            {products.filter((p) => !search.trim() || p.name.toLowerCase().includes(search.toLowerCase()) || p.description?.toLowerCase().includes(search.toLowerCase())).map((product) => (
               <SortableProductItem
                 key={product.id}
                 product={product}
@@ -523,6 +557,7 @@ export default function ProductsPage() {
                 setToast={setToast}
                 loadData={loadData}
                 onEdit={setEditProduct}
+                onDuplicate={duplicateProduct}
               />
             ))}
           </div>
