@@ -6,8 +6,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
 import BartenderLoader from "../../components/menu/BartenderLoader";
 
-function ProductCard({ product, primary, variants }) {
+function ProductCard({ product, primary, variants, prices }) {
   const hasVariants = variants && variants.length > 0;
+  const hasCustomPrices = prices && prices.length > 0;
 
   return (
     <div className="border-b py-5" style={{ borderColor: `${primary}18` }}>
@@ -60,8 +61,18 @@ function ProductCard({ product, primary, variants }) {
 
           {/* Precios */}
           <div className="mt-2 flex gap-3 pl-3 sm:mt-0 sm:flex-col sm:items-end sm:gap-1 sm:pl-0">
-            {product.price_500 > 0 && <p className="text-base font-bold sm:text-lg" style={{ color: primary }}>500ml · ${Number(product.price_500).toLocaleString("es-CL")}</p>}
-            {product.price_1000 > 0 && <p className="text-xs text-zinc-400 sm:text-sm">1L · ${Number(product.price_1000).toLocaleString("es-CL")}</p>}
+            {hasCustomPrices ? (
+              prices.map((p, i) => (
+                <p key={p.id} className={i === 0 ? "text-base font-bold sm:text-lg" : "text-xs text-zinc-400 sm:text-sm"} style={i === 0 ? { color: primary } : {}}>
+                  {p.label} · ${Number(p.price).toLocaleString("es-CL")}
+                </p>
+              ))
+            ) : (
+              <>
+                {product.price_500 > 0 && <p className="text-base font-bold sm:text-lg" style={{ color: primary }}>500ml · ${Number(product.price_500).toLocaleString("es-CL")}</p>}
+                {product.price_1000 > 0 && <p className="text-xs text-zinc-400 sm:text-sm">1L · ${Number(product.price_1000).toLocaleString("es-CL")}</p>}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -91,6 +102,7 @@ export default function MenuPage() {
   const [search, setSearch] = useState("");
   const [promotions, setPromotions] = useState([]);
   const [variantsMap, setVariantsMap] = useState({});
+  const [pricesMap, setPricesMap] = useState({});
 
   const [loaderColors] = useState(getCachedColors);
   const { dark, toggle: toggleTheme, bg: themeBg, surface, text, textMuted } = useTheme(settings?.primary_color);
@@ -115,12 +127,13 @@ export default function MenuPage() {
   }, []);
 
   async function loadData() {
-    const [{ data: s }, { data: c }, { data: p }, { data: promo }, { data: vars }] = await Promise.all([
+    const [{ data: s }, { data: c }, { data: p }, { data: promo }, { data: vars }, { data: prc }] = await Promise.all([
       supabase.from("settings").select("*").limit(1).maybeSingle(),
       supabase.from("categories").select("*").eq("active", true).order("sort_order"),
       supabase.from("products").select("*, categories(name)").eq("active", true).order("sort_order"),
       supabase.from("promotions").select("*").eq("active", true).order("sort_order"),
       supabase.from("product_variants").select("*").order("sort_order"),
+      supabase.from("product_prices").select("*").order("sort_order"),
     ]);
     setSettings(s || null);
     setCategories(c || []);
@@ -133,6 +146,14 @@ export default function MenuPage() {
       map[v.product_id].push(v);
     });
     setVariantsMap(map);
+
+    // Agrupa precios personalizados por product_id
+    const pmap = {};
+    (prc || []).forEach((p) => {
+      if (!pmap[p.product_id]) pmap[p.product_id] = [];
+      pmap[p.product_id].push(p);
+    });
+    setPricesMap(pmap);
     setActiveCategory(c?.[0]?.id || null);
 
     // Guarda colores en cache para el próximo loading
@@ -495,7 +516,7 @@ export default function MenuPage() {
                   searchResults.map((product, index) => (
                     <motion.div key={product.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04 }}>
                       <p className="mb-1 text-xs" style={{ color: primary }}>{product.categories?.name}</p>
-                      <ProductCard product={product} primary={primary} variants={variantsMap[product.id] || []} />
+                      <ProductCard product={product} primary={primary} variants={variantsMap[product.id] || []} prices={pricesMap[product.id] || []} />
                     </motion.div>
                   ))
                 )}
@@ -542,7 +563,7 @@ export default function MenuPage() {
                           viewport={{ once: true }}
                           transition={{ delay: index * 0.05, duration: 0.3 }}
                         >
-                          <ProductCard product={product} primary={primary} variants={variantsMap[product.id] || []} />
+                          <ProductCard product={product} primary={primary} variants={variantsMap[product.id] || []} prices={pricesMap[product.id] || []} />
                         </motion.div>
                       ))}
                     </div>

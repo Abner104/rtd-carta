@@ -12,7 +12,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-function SortableProductItem({ product, primary, openVariants, setOpenVariants, toggleProduct, deleteProduct, setToast, loadData, onEdit }) {
+function SortableProductItem({ product, primary, openVariants, setOpenVariants, openPrices, setOpenPrices, toggleProduct, deleteProduct, setToast, loadData, onEdit }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: product.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
@@ -46,6 +46,14 @@ function SortableProductItem({ product, primary, openVariants, setOpenVariants, 
             style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "#d4d4d8" }}
           >
             <Pencil size={14} /> Editar
+          </button>
+          <button
+            onClick={() => setOpenPrices(openPrices === product.id ? null : product.id)}
+            className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition"
+            style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "#d4d4d8" }}
+          >
+            $ Precios
+            <ChevronDown size={13} style={{ transform: openPrices === product.id ? "rotate(180deg)" : "rotate(0)" }} />
           </button>
           <button
             onClick={() => setOpenVariants(openVariants === product.id ? null : product.id)}
@@ -87,6 +95,18 @@ function SortableProductItem({ product, primary, openVariants, setOpenVariants, 
           </button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {openPrices === product.id && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <PricesPanel product={product} primary={primary} onToast={setToast} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {openVariants === product.id && (
@@ -186,6 +206,94 @@ function VariantsPanel({ product, primary, onToast }) {
   );
 }
 
+function PricesPanel({ product, primary, onToast }) {
+  const [prices, setPrices] = useState([]);
+  const [form, setForm] = useState({ label: "", price: "" });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { loadPrices(); }, [product.id]);
+
+  async function loadPrices() {
+    const { data } = await supabase.from("product_prices").select("*").eq("product_id", product.id).order("sort_order");
+    setPrices(data || []);
+  }
+
+  async function addPrice(e) {
+    e.preventDefault();
+    if (!form.label.trim() || !form.price) return;
+    setSaving(true);
+    const { error } = await supabase.from("product_prices").insert({
+      product_id: product.id,
+      label: form.label,
+      price: Number(form.price),
+      sort_order: prices.length,
+    });
+    setSaving(false);
+    if (error) { onToast("Error: " + error.message); return; }
+    setForm({ label: "", price: "" });
+    await loadPrices();
+    onToast("Precio agregado");
+  }
+
+  async function deletePrice(id) {
+    if (!confirm("¿Eliminar este precio?")) return;
+    await supabase.from("product_prices").delete().eq("id", id);
+    await loadPrices();
+    onToast("Precio eliminado");
+  }
+
+  return (
+    <div className="mb-2 ml-4 rounded-xl border border-zinc-700 bg-zinc-950 p-4">
+      <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+        <span style={{ color: primary }}>$</span> Precios personalizados
+        <span className="normal-case text-zinc-600 font-normal">· ej: Copa, Botella, 300ml...</span>
+      </p>
+
+      <form onSubmit={addPrice} className="mb-3 flex gap-2">
+        <input
+          value={form.label}
+          onChange={(e) => setForm({ ...form, label: e.target.value })}
+          placeholder="Etiqueta (ej: Copa)"
+          className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-zinc-500"
+        />
+        <input
+          value={form.price}
+          onChange={(e) => setForm({ ...form, price: e.target.value })}
+          placeholder="Precio"
+          type="number" min="0"
+          className="w-28 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-zinc-500"
+        />
+        <button
+          type="submit" disabled={saving}
+          className="flex items-center gap-1 rounded-lg px-4 py-2 text-xs font-bold text-black transition hover:opacity-80 disabled:opacity-50"
+          style={{ backgroundColor: primary }}
+        >
+          <Plus size={13} />
+          {saving ? "..." : "Agregar"}
+        </button>
+      </form>
+
+      {prices.length === 0 ? (
+        <p className="text-xs italic text-zinc-600">Sin precios personalizados. Se usarán los de 500ml / 1L.</p>
+      ) : (
+        <div className="space-y-1">
+          {prices.map((p) => (
+            <div key={p.id} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ backgroundColor: `${primary}10` }}>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium" style={{ color: primary }}>{p.label}</span>
+                <span className="text-sm text-zinc-300">${Number(p.price).toLocaleString("es-CL")}</span>
+              </div>
+              <button onClick={() => deletePrice(p.id)} className="text-red-400 hover:text-red-300 transition">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Toast({ message, onDone }) {
   useEffect(() => {
     const t = setTimeout(onDone, 2500);
@@ -212,6 +320,7 @@ export default function ProductsPage() {
   const [uploading, setUploading] = useState(false);
   const [toast, setToast] = useState(null);
   const [openVariants, setOpenVariants] = useState(null);
+  const [openPrices, setOpenPrices] = useState(null);
   const [editProduct, setEditProduct] = useState(null); // producto en edición
   const listRef = useRef(null);
   const formRef = useRef(null);
@@ -407,6 +516,8 @@ export default function ProductsPage() {
                 primary={primary}
                 openVariants={openVariants}
                 setOpenVariants={setOpenVariants}
+                openPrices={openPrices}
+                setOpenPrices={setOpenPrices}
                 toggleProduct={toggleProduct}
                 deleteProduct={deleteProduct}
                 setToast={setToast}
