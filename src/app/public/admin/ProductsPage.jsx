@@ -56,14 +56,6 @@ function SortableProductItem({ product, primary, openVariants, setOpenVariants, 
             <Copy size={14} />
           </button>
           <button
-            onClick={() => setOpenPrices(openPrices === product.id ? null : product.id)}
-            className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition"
-            style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "#d4d4d8" }}
-          >
-            $ Precios
-            <ChevronDown size={13} style={{ transform: openPrices === product.id ? "rotate(180deg)" : "rotate(0)" }} />
-          </button>
-          <button
             onClick={() => setOpenVariants(openVariants === product.id ? null : product.id)}
             className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition"
             style={{ backgroundColor: `${primary}18`, color: primary }}
@@ -330,7 +322,14 @@ export default function ProductsPage() {
   const [openVariants, setOpenVariants] = useState(null);
   const [openPrices, setOpenPrices] = useState(null);
   const [editProduct, setEditProduct] = useState(null);
-  const [search, setSearch] = useState(""); // producto en edición
+  const [editPrices, setEditPrices] = useState([]);
+  const [search, setSearch] = useState("");
+
+  async function openEditModal(product) {
+    const { data } = await supabase.from("product_prices").select("*").eq("product_id", product.id).order("sort_order");
+    setEditPrices(data?.length > 0 ? data : [{ label: "", price: "" }]);
+    setEditProduct(product);
+  } // producto en edición
   const listRef = useRef(null);
   const formRef = useRef(null);
 
@@ -354,7 +353,23 @@ export default function ProductsPage() {
       image_url: finalImageUrl,
     }).eq("id", id);
     if (error) { setToast("Error al guardar"); return; }
+
+    // Actualizar precios: borrar los viejos y reinsertar
+    await supabase.from("product_prices").delete().eq("product_id", id);
+    const validPrices = editPrices.filter((p) => p.label?.trim() && p.price);
+    if (validPrices.length > 0) {
+      await supabase.from("product_prices").insert(
+        validPrices.map((p, i) => ({
+          product_id: id,
+          label: p.label,
+          price: Number(p.price),
+          sort_order: i,
+        }))
+      );
+    }
+
     setEditProduct(null);
+    setEditPrices([]);
     await loadData();
     setToast("Producto actualizado");
   }
@@ -376,8 +391,9 @@ export default function ProductsPage() {
   }
 
   const [form, setForm] = useState({
-    category_id: "", name: "", description: "", price_500: "", price_1000: "",
+    category_id: "", name: "", description: "",
   });
+  const [formPrices, setFormPrices] = useState([{ label: "", price: "" }]);
 
   useEffect(() => { loadData(); }, []);
 
@@ -428,20 +444,32 @@ export default function ProductsPage() {
     let imageUrl = "";
     if (fileInput?.files?.[0]) imageUrl = await uploadImage(fileInput.files[0]);
 
-    const { error } = await supabase.from("products").insert({
+    const { data: newProduct, error } = await supabase.from("products").insert({
       category_id: form.category_id,
       name: form.name,
       description: form.description,
-      price_500: Number(form.price_500 || 0),
-      price_1000: Number(form.price_1000 || 0),
       image_url: imageUrl,
       active: true,
       sort_order: products.length + 1,
-    });
+    }).select().single();
 
     if (error) { setToast("Error creando producto"); return; }
 
-    setForm({ category_id: "", name: "", description: "", price_500: "", price_1000: "" });
+    // Guardar precios personalizados si tienen label y precio
+    const validPrices = formPrices.filter((p) => p.label.trim() && p.price);
+    if (validPrices.length > 0) {
+      await supabase.from("product_prices").insert(
+        validPrices.map((p, i) => ({
+          product_id: newProduct.id,
+          label: p.label,
+          price: Number(p.price),
+          sort_order: i,
+        }))
+      );
+    }
+
+    setForm({ category_id: "", name: "", description: "" });
+    setFormPrices([{ label: "", price: "" }]);
     if (fileInput) fileInput.value = "";
     await loadData();
     setToast("Producto creado");
@@ -482,39 +510,79 @@ export default function ProductsPage() {
 
       <form ref={formRef} onSubmit={createProduct} className="mt-8 grid gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
         <div className="grid gap-4 md:grid-cols-2">
-          <select
-            className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none"
-            value={form.category_id}
-            onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-          >
-            <option value="">Selecciona categoría *</option>
-            {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-          </select>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-zinc-400">Categoría *</label>
+            <select
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-white outline-none"
+              value={form.category_id}
+              onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+            >
+              <option value="">Seleccioná una categoría</option>
+              {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-zinc-400">Nombre *</label>
+            <input
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-white outline-none"
+              placeholder="Ej: Mojito Tradicional"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </div>
+        </div>
 
-          <input
-            className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none"
-            placeholder="Nombre del trago *"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-zinc-400">Descripción / ingredientes</label>
+          <textarea
+            className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-white outline-none"
+            placeholder="Ej: Ron, menta, limón, azúcar y soda"
+            rows="2"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
         </div>
 
-        <textarea
-          className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none"
-          placeholder="Descripción / ingredientes"
-          rows="2"
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-        />
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <input className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none" placeholder="Precio 500ml" type="number" value={form.price_500} onChange={(e) => setForm({ ...form, price_500: e.target.value })} />
-          <input className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none" placeholder="Precio 1 litro" type="number" value={form.price_1000} onChange={(e) => setForm({ ...form, price_1000: e.target.value })} />
+        {/* Precios personalizados */}
+        <div>
+          <label className="mb-2 block text-xs font-medium text-zinc-400">Precios</label>
+          <div className="grid gap-2">
+            {formPrices.map((fp, i) => (
+              <div key={i} className="flex gap-2">
+                <input
+                  value={fp.label}
+                  onChange={(e) => { const n = [...formPrices]; n[i].label = e.target.value; setFormPrices(n); }}
+                  placeholder="Etiqueta (ej: 500ml, Copa, 1 Litro)"
+                  className="flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none"
+                />
+                <input
+                  value={fp.price}
+                  onChange={(e) => { const n = [...formPrices]; n[i].price = e.target.value; setFormPrices(n); }}
+                  placeholder="Precio"
+                  type="number" min="0"
+                  className="w-32 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none"
+                />
+                {formPrices.length > 1 && (
+                  <button type="button" onClick={() => setFormPrices(formPrices.filter((_, j) => j !== i))}
+                    className="rounded-xl bg-red-500/20 px-3 text-red-400 hover:bg-red-500/30 transition">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setFormPrices([...formPrices, { label: "", price: "" }])}
+              className="flex items-center gap-2 rounded-xl border border-dashed border-zinc-700 px-4 py-2 text-xs text-zinc-500 transition hover:text-zinc-300"
+            >
+              <Plus size={13} /> Agregar precio
+            </button>
+          </div>
         </div>
 
-        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed px-4 py-4 text-zinc-300 transition hover:opacity-80" style={{ borderColor: `${primary}66` }}>
-          <ImagePlus size={22} style={{ color: primary }} />
-          <span>Subir imagen del trago</span>
+        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed px-4 py-4 text-zinc-300 transition hover:opacity-80" style={{ borderColor: `${primary}44` }}>
+          <ImagePlus size={20} style={{ color: primary }} />
+          <span className="text-sm">Subir imagen del trago</span>
           <input type="file" accept="image/*" className="hidden" />
         </label>
 
@@ -556,7 +624,7 @@ export default function ProductsPage() {
                 deleteProduct={deleteProduct}
                 setToast={setToast}
                 loadData={loadData}
-                onEdit={setEditProduct}
+                onEdit={openEditModal}
                 onDuplicate={duplicateProduct}
               />
             ))}
@@ -630,6 +698,41 @@ export default function ProductsPage() {
                       type="number" min="0"
                       className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
                     />
+                  </div>
+                </div>
+
+                {/* Precios */}
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-zinc-400">Precios</label>
+                  <div className="grid gap-2">
+                    {editPrices.map((ep, i) => (
+                      <div key={i} className="flex gap-2">
+                        <input
+                          value={ep.label || ""}
+                          onChange={(e) => { const n = [...editPrices]; n[i] = { ...n[i], label: e.target.value }; setEditPrices(n); }}
+                          placeholder="Etiqueta (ej: Copa, 500ml)"
+                          className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2.5 text-sm text-white outline-none"
+                        />
+                        <input
+                          value={ep.price || ""}
+                          onChange={(e) => { const n = [...editPrices]; n[i] = { ...n[i], price: e.target.value }; setEditPrices(n); }}
+                          placeholder="Precio"
+                          type="number" min="0"
+                          className="w-28 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2.5 text-sm text-white outline-none"
+                        />
+                        {editPrices.length > 1 && (
+                          <button type="button" onClick={() => setEditPrices(editPrices.filter((_, j) => j !== i))}
+                            className="rounded-xl bg-red-500/20 px-3 text-red-400 hover:bg-red-500/30 transition">
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button type="button"
+                      onClick={() => setEditPrices([...editPrices, { label: "", price: "" }])}
+                      className="flex items-center gap-2 rounded-xl border border-dashed border-zinc-700 px-4 py-2 text-xs text-zinc-500 transition hover:text-zinc-300">
+                      <Plus size={13} /> Agregar precio
+                    </button>
                   </div>
                 </div>
 
